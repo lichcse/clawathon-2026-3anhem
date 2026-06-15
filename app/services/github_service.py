@@ -134,16 +134,23 @@ async def _generate_review(diff: str, context: str, rule: str = "") -> str:
         temperature=0.1,
     )
 
-    rule_section = f"\n\nProject review rules (follow these strictly):\n{rule}" if rule else ""
-    system = (
-        "You are a senior code reviewer. Analyze the provided diff and identify:\n"
-        "1. Potential bugs or logic errors\n"
-        "2. Security vulnerabilities (injection, hardcoded secrets, etc.)\n"
-        "3. Performance concerns\n"
-        "4. Code quality issues (naming, duplication, missing error handling)\n\n"
-        "Format: concise markdown list. Maximum 400 words. Be specific with file and line references."
-        + rule_section
-    )
+    if rule:
+        system = (
+            "You are a senior code reviewer. "
+            "Review the provided diff STRICTLY following the project rules below. "
+            "Do NOT apply generic criteria outside of these rules — the rules define exactly what to check.\n\n"
+            f"PROJECT REVIEW RULES (follow EXACTLY):\n{rule}\n\n"
+            "Format: concise markdown list. Be specific with file and line references. Maximum 400 words."
+        )
+    else:
+        system = (
+            "You are a senior code reviewer. Analyze the provided diff and identify:\n"
+            "1. Potential bugs or logic errors\n"
+            "2. Security vulnerabilities (injection, hardcoded secrets, etc.)\n"
+            "3. Performance concerns\n"
+            "4. Code quality issues (naming, duplication, missing error handling)\n\n"
+            "Format: concise markdown list. Maximum 400 words. Be specific with file and line references."
+        )
     user = f"Review this {context}:\n\n{diff[:6000]}"
     try:
         resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
@@ -310,16 +317,22 @@ async def process_docs_update(repo_id: int, payload: dict):
         temperature=0.2,
     )
 
+    system_content = (
+        "You are a technical documentation writer. "
+        "You MUST follow the documentation rules below EXACTLY — match the structure, format, and style as specified. "
+        "Do NOT deviate from these rules.\n\n"
+        f"DOCUMENTATION RULES (follow EXACTLY):\n{rule_content}"
+    )
+
     prompt = (
-        f"Documentation rule to follow:\n{rule_content}\n\n"
-        f"Write or update documentation for these changed files:\n\n"
+        "Write or update documentation for these changed files:\n\n"
         + "\n\n".join(file_summaries)
         + "\n\nReturn ONLY the markdown documentation content."
     )
 
     try:
         resp = await llm.ainvoke([
-            SystemMessage(content="You are a technical documentation writer."),
+            SystemMessage(content=system_content),
             HumanMessage(content=prompt),
         ])
         doc_content = resp.content
