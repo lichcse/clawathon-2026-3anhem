@@ -1,0 +1,15 @@
+.git/
+.gitignore
+.env
+.env.*
+data/
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+.agentbase/
+.agentbase-state.json
+*.md
+UI.png
+build.txt

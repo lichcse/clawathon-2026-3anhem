@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 3anhem-agent:latest
+    container_name: 3anhem-agent
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist database and cloned repos across redeploys
+      - ./data:/app/data
+      # Live-reload static files without rebuild
+      - ./app/static:/app/app/static
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

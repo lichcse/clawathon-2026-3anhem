@@ -3,13 +3,25 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# ─── 3 ANH EM Agent — Sensitive & Generated Files ───
+.env
+.env.*
+.greennode.json
+data/
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+.agentbase/
+.agentbase-state.json
+
 # User-specific files
 *.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-*.env
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

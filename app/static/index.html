@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3 ANH EM — Code Review Agent</title>
+<link rel="stylesheet" href="/static/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: false, theme: 'dark', darkMode: true,
+    securityLevel: 'loose',
+    fontFamily: "'SF Mono','Fira Code',monospace",
+    themeVariables: { background: '#0d1117', primaryColor: '#1f6feb', lineColor: '#58a6ff', textColor: '#e6edf3' }
+  });
+</script>
+</head>
+<body>
+
+<!-- ─── Background Layer ─── -->
+<div id="bg-photo-wrap">
+  <img id="bg-photo" src="/static/01-What-It-Takes-to-Become-an-AI-Ethical-Hacker-1024x576.webp" alt="" onerror="this.style.display='none'" />
+</div>
+<canvas id="matrix-bg"></canvas>
+
+<div id="app">
+
+  <!-- ─── Left Sidebar ─── -->
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <span class="app-logo">⬡</span>
+      <span class="app-name">3 ANH EM</span>
+      <button class="icon-btn sidebar-toggle-btn" title="Toggle sidebar" onclick="toggleSidebar()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <button id="add-repo-btn" onclick="openAddRepo()">
+      <span class="plus">+</span>
+      <span>Add new repository</span>
+    </button>
+
+    <div class="section-label">
+      <span>Git repositories</span>
+      <button class="icon-btn" style="font-size:12px" title="Sort" onclick="loadRepos()">↕</button>
+    </div>
+
+    <div id="repo-list">
+      <div style="padding:20px;text-align:center;color:var(--text-2);font-size:12px;">Loading…</div>
+    </div>
+
+    <div id="sidebar-footer">
+      <div class="sf-status">
+        <span class="sf-dot"></span>
+        <span class="sf-label">AGENT ONLINE</span>
+      </div>
+      <div class="sf-bars">
+        <div class="sf-bar-row"><span>LangGraph</span><div class="sf-bar"><div style="width:88%"></div></div></div>
+        <div class="sf-bar-row"><span>FastAPI</span><div class="sf-bar"><div style="width:95%"></div></div></div>
+        <div class="sf-bar-row"><span>RAG</span><div class="sf-bar"><div style="width:72%"></div></div></div>
+      </div>
+      <div class="sf-brand">3 ANH EM · Code Agent v1.0</div>
+    </div>
+  </aside>
+
+  <!-- ─── Main Chat ─── -->
+  <main id="main">
+    <div id="chat-header">
+      <button id="sidebar-show-btn" class="icon-btn" onclick="toggleSidebar()" title="Mở sidebar" style="display:none;margin-right:6px;">☰</button>
+      <div class="repo-dropdown" id="current-repo-label">
+        <span>Select a repository</span>
+        <span style="color:var(--text-2)">▾</span>
+      </div>
+      <div class="chat-actions">
+        <select id="model-selector" onchange="selectedModel=this.value" title="Select AI model"></select>
+        <button onclick="clearHistory()" title="Clear chat history">🗑 Clear</button>
+      </div>
+    </div>
+
+    <div id="chat-area">
+      <!-- No repo selected -->
+      <div id="welcome">
+        <div class="welcome-card">
+          <div class="welcome-icon">⬡</div>
+          <h2>3 ANH EM Code Agent</h2>
+          <div class="welcome-sub">// AI-powered code review &amp; assistant</div>
+          <p>Hỏi đáp về code · Review commit &amp; PR · Tạo branch · Thêm &amp; sửa code · Tạo Merge Request</p>
+          <div class="welcome-badge">branch-protected · webhook-ready · multi-repo</div>
+        </div>
+      </div>
+
+      <!-- Repo selected, no messages yet -->
+      <div id="empty-hint" style="display:none;">
+        <p class="empty-quote">Ngay cả khi bạn không biết code, bạn vẫn có thể tạo ra sản phẩm tuyệt vời với 3 ANH EM Code Agent</p>
+        <p class="empty-sub">// ask anything about the repository</p>
+      </div>
+
+      <!-- Messages -->
+      <div id="messages" style="display:none;"></div>
+
+      <!-- Input bar (centered when empty, pinned to bottom when chatting) -->
+      <div id="chat-bottom" style="display:none;">
+        <div class="suggestions" id="suggestions">
+          <button class="suggestion-chip" onclick="sendSuggestion('Mô tả cấu trúc thư mục của repo này')">Cấu trúc dự án</button>
+          <button class="suggestion-chip" onclick="sendSuggestion('Tạo sequence diagram cho luồng chính của ứng dụng')">Sequence diagram</button>
+          <button class="suggestion-chip" onclick="sendSuggestion('Liệt kê các API endpoint có trong project')">Danh sách APIs</button>
+          <button class="suggestion-chip" onclick="sendSuggestion('Xem nội dung các file trong thư mục rules/ nếu có')">Xem các rules</button>
+          <button class="suggestion-chip" id="pull-chip" onclick="pullCurrentRepo()">⬇ Pull code</button>
+        </div>
+        <div id="input-row">
+          <textarea id="msg-input" rows="1" placeholder="Hỏi về code, tạo branch, review, viết docs…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button id="send-btn" onclick="sendMessage()">SEND ↑</button>
+        </div>
+        <div class="chat-footer-note">3 ANH EM agent can make mistakes. Please double-check responses.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ─── Right Sidebar — World Cup ─── -->
+  <aside id="worldcup-sidebar">
+    <div id="wc-header">
+      <h3>⚽ Vui cùng World Cup 2026</h3>
+    </div>
+    <div id="wc-content">
+      <div style="padding:20px;text-align:center;color:var(--text-2);font-size:12px;">Đang tải…</div>
+    </div>
+  </aside>
+</div>
+
+<!-- ─── Add Repo Modal ─── -->
+<div id="add-repo-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3>➕ Thêm Repository mới</h3>
+      <button class="modal-close" onclick="closeModal('add-repo-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Tên Repository <span class="req">*</span></label>
+        <input type="text" id="f-name" placeholder="Ví dụ: User Management Service" />
+      </div>
+      <div class="form-group">
+        <label>GitHub URL <span class="req">*</span></label>
+        <input type="text" id="f-url" placeholder="https://github.com/owner/repo" oninput="resetValidationState()" />
+        <div class="hint">⚠ Phải là repository public, hoặc nhập token nếu private</div>
+      </div>
+      <div class="form-group">
+        <label>Branch chính <span class="req">*</span></label>
+        <input type="text" id="f-branch" value="main" placeholder="main" oninput="resetValidationState()" />
+        <div class="hint">Branch chính để hỏi đáp và cập nhật tài liệu</div>
+      </div>
+
+      <div class="form-group">
+        <label>Loại repository</label>
+        <div class="toggle-group">
+          <label class="toggle-item">
+            <input type="checkbox" id="f-private" onchange="togglePrivateFields(); resetValidationState()" />
+            <span>🔒 Private repository (cần xác thực)</span>
+          </label>
+          <label class="toggle-item" id="f-interact-row" style="display:none;">
+            <input type="checkbox" id="f-interact" onchange="togglePrivateFields()" />
+            <span>🔧 Tương tác với source (post comments, push docs)</span>
+          </label>
+          <div id="auto-features-group" style="display:none;padding-left:22px;margin-top:4px;gap:6px;display:none;flex-direction:column;">
+            <div class="feature-item">
+              <label class="toggle-item">
+                <input type="checkbox" id="f-auto-docs" />
+                <span>📝 Tự động viết & cập nhật tài liệu</span>
+              </label>
+              <div class="feature-note">📄 Cần có file <code>rules/docs.md</code> trong repo để định nghĩa cách viết tài liệu</div>
+            </div>
+            <div class="feature-item">
+              <label class="toggle-item">
+                <input type="checkbox" id="f-review-mr" />
+                <span>🔍 Review code khi có Merge Request</span>
+              </label>
+              <div class="feature-note">📄 Cần có file <code>rules/review.md</code> trong repo để định nghĩa tiêu chí review</div>
+            </div>
+            <div class="feature-item">
+              <label class="toggle-item">
+                <input type="checkbox" id="f-review-commit" />
+                <span>🔍 Review code khi có Commit mới</span>
+              </label>
+              <div class="feature-note">📄 Cần có file <code>rules/review.md</code> trong repo để định nghĩa tiêu chí review</div>
+            </div>
+          </div>
+        </div>
+        <div id="private-fields" class="private-fields" style="display:none;">
+          <div class="form-row">
+            <div class="form-group" style="margin:0">
+              <label>GitHub Username</label>
+              <input type="text" id="f-username" placeholder="your-username" oninput="resetValidationState()" />
+            </div>
+            <div class="form-group" style="margin:0">
+              <label>Personal Access Token</label>
+              <input type="password" id="f-token" placeholder="ghp_xxxx" oninput="resetValidationState()" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="toggle-item">
+          <input type="checkbox" id="f-shared" />
+          <span>🌐 Chia sẻ repository này cho người khác</span>
+        </label>
+      </div>
+
+      <div id="validation-result"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('add-repo-modal')">Hủy</button>
+      <button class="btn btn-secondary" onclick="validateRepo()" id="validate-btn">🔍 Kiểm tra</button>
+      <button class="btn btn-primary" onclick="submitRepo()" id="submit-btn" disabled>Thêm Repository</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Repo Context Menu ─── -->
+<div id="context-menu" style="display:none;position:fixed;">
+  <button onclick="recloneRepo()">↺ reclone</button>
+  <button onclick="showWebhookInfo()">⬡ webhook</button>
+  <button data-action="delete" onclick="deleteRepo()">✕ delete</button>
+</div>
+
+<!-- ─── Webhook Info Modal ─── -->
+<div id="webhook-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-header">
+      <h3>🔗 Webhook Configuration</h3>
+      <button class="modal-close" onclick="closeModal('webhook-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;margin-bottom:12px;">Cấu hình webhook này trên GitHub để nhận thông báo commit và pull request:</p>
+      <div class="form-group">
+        <label>Webhook URL</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="wh-url" readonly style="flex:1;background:var(--bg-2);font-family:monospace;font-size:12px;" />
+          <button class="btn btn-secondary" style="flex-shrink:0;" onclick="copyText('wh-url')">Copy</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Secret</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="wh-secret" readonly style="flex:1;background:var(--bg-2);font-family:monospace;font-size:12px;" />
+          <button class="btn btn-secondary" style="flex-shrink:0;" onclick="copyText('wh-secret')">Copy</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-2);background:var(--bg-2);padding:8px 10px;border-radius:var(--radius);line-height:1.5;">
+        <strong>GitHub Settings → Webhooks → Add webhook</strong><br/>
+        Content type: <code>application/json</code><br/>
+        Events: <em>Pushes</em>, <em>Pull requests</em>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Diagram fullscreen modal -->
+<div id="diagram-modal" onclick="closeDiagramModal(event)">
+  <div id="diagram-modal-content" onclick="event.stopPropagation()"></div>
+  <button id="diagram-modal-close" onclick="closeDiagramModal()">✕ Đóng (Esc)</button>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
