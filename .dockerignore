@@ -13,3 +13,4 @@ venv/
 *.md
 UI.png
 build.txt
+.greennode.json

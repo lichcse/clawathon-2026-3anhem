@@ -12,6 +12,8 @@ services:
       - ./data:/app/data
       # Live-reload static files without rebuild
       - ./app/static:/app/app/static
+      # AgentBase IAM credentials for Memory/Deploy SDK
+      - ./.greennode.json:/app/.greennode.json:ro
     env_file:
       - .env
     restart: unless-stopped

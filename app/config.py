@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     FOOTBALL_API_KEY: str = ""
 
+    AGENTBASE_MEMORY_ID: str = ""
+    AGENTBASE_MEMORY_STRATEGY_ID: str = ""
+
     AGENT_BOT_LOGIN: str = "3anhem-bot"
     AGENT_COMMIT_PREFIX: str = "[auto-docs]"
 

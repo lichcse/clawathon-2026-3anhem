@@ -25,11 +25,68 @@ from app.services.github_service import create_pull_request_sync
 
 settings = get_settings()
 
+# ─── AgentBase Memory client (lazy, shared) ────────────────────────────────
+
+_memory_client = None
+
+
+def _get_memory_client():
+    global _memory_client
+    if _memory_client is None and settings.AGENTBASE_MEMORY_ID:
+        try:
+            from greennode_agentbase.memory import MemoryClient
+            _memory_client = MemoryClient()
+        except Exception:
+            pass
+    return _memory_client
+
+
+async def _recall_facts(query: str, actor_id: str) -> str:
+    """Search AgentBase long-term memory for facts relevant to the query."""
+    client = _get_memory_client()
+    if not client or not settings.AGENTBASE_MEMORY_ID or not settings.AGENTBASE_MEMORY_STRATEGY_ID:
+        return ""
+    try:
+        from greennode_agentbase.memory.models import MemoryRecordSearchRequest
+        namespace = f"/strategies/{settings.AGENTBASE_MEMORY_STRATEGY_ID}/actors/{actor_id}"
+        results = await client.search_memory_records_async(
+            id=settings.AGENTBASE_MEMORY_ID,
+            namespace=namespace,
+            request=MemoryRecordSearchRequest(query=query, limit=5),
+        )
+        if not results:
+            return ""
+        return "\n".join(f"- {r.memory}" for r in results if r.score > 0.3)
+    except Exception:
+        return ""
+
+
+async def _store_fact(fact: str, actor_id: str) -> bool:
+    """Store a fact into AgentBase long-term memory."""
+    client = _get_memory_client()
+    if not client or not settings.AGENTBASE_MEMORY_ID or not settings.AGENTBASE_MEMORY_STRATEGY_ID:
+        return False
+    try:
+        namespace = f"/strategies/{settings.AGENTBASE_MEMORY_STRATEGY_ID}/actors/{actor_id}"
+        await client.insert_memory_records_directly_async(
+            id=settings.AGENTBASE_MEMORY_ID,
+            namespace=namespace,
+            request=[fact],
+        )
+        return True
+    except Exception:
+        return False
+
+
 _SYSTEM_PROMPT = """\
 You are an expert software engineer AI assistant for the repository "{repo_name}".
 GitHub: {github_url} | Branch: {main_branch}
 
 You have tools to explore AND modify the cloned source code:
+
+MEMORY tools (long-term memory across sessions):
+- remember_fact: store important facts about the repo, architecture decisions, or user preferences
+- recall_facts: search past memories relevant to a question (use proactively before answering complex questions)
 
 READ tools:
 - read_file: read any file
@@ -128,6 +185,22 @@ async def get_agent_response(
         )
         return
 
+    actor_id = str(repo.user_id)
+
+    # ── Memory tools (bound to current user/repo scope) ─────────────────────
+    @tool
+    async def remember_fact(fact: str) -> str:
+        """Remember an important fact about this repository, its architecture, or the user's preferences for future sessions.
+        Use this when the user mentions something worth recalling later (e.g. design decisions, known issues, preferences)."""
+        ok = await _store_fact(f"[{repo.name}] {fact}", actor_id)
+        return "Đã ghi nhớ." if ok else "Bộ nhớ chưa được cấu hình."
+
+    @tool
+    async def recall_facts(query: str) -> str:
+        """Search long-term memory for facts related to a query about this repository or the user's past preferences."""
+        facts = await _recall_facts(query, actor_id)
+        return facts if facts else "Không tìm thấy ký ức nào liên quan."
+
     # Build tools bound to this repo
     @tool
     def read_file_tool(file_path: str) -> str:
@@ -225,6 +298,7 @@ async def get_agent_response(
         return create_pull_request_sync(repo.github_url, title, body, head_branch, target_base, token)
 
     tools = [
+        remember_fact, recall_facts,
         read_file_tool, list_directory_tool, search_code_tool, get_repo_tree_tool,
         list_branches_tool, create_branch_tool, write_file_tool, commit_tool, push_tool,
         create_pr_tool,
@@ -254,13 +328,20 @@ async def get_agent_response(
                 pass
     rules_section = ("\n\nPROJECT RULES (MUST FOLLOW):\n" + "\n\n---\n\n".join(rules_parts)) if rules_parts else ""
 
+    # Auto-recall long-term memory facts relevant to the current message
+    recalled = await _recall_facts(message, actor_id)
+    memory_section = (
+        f"\n\nLONG-TERM MEMORY (facts recalled from past sessions — use as context):\n{recalled}"
+        if recalled else ""
+    )
+
     system_msg = SystemMessage(
-        content=_SYSTEM_PROMPT.format(
+        content=(_SYSTEM_PROMPT.format(
             repo_name=repo.name,
             github_url=repo.github_url,
             main_branch=repo.main_branch,
             rules_section=rules_section,
-        ).replace('main_branch = "{main_branch}"', f'main_branch = "{repo.main_branch}"')
+        ) + memory_section).replace('main_branch = "{main_branch}"', f'main_branch = "{repo.main_branch}"')
     )
 
     # Convert stored history to LangChain messages

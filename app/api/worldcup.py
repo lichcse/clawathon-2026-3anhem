@@ -1,27 +1,107 @@
 import asyncio
-from datetime import date, datetime, timezone, timedelta
+import re
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter
 import httpx
 
-# All times displayed in Vietnam timezone (UTC+7)
+# Vietnam timezone (UTC+7)
 VN_TZ = timezone(timedelta(hours=7))
 
 router = APIRouter()
 
-# TheSportsDB — free public API, league 4429 = FIFA World Cup
-SPORTSDB_BASE = "https://www.thesportsdb.com/api/v1/json/2"
-SPORTSDB_LEAGUE_ID = "4429"
+URL_24H = (
+    "https://www.24h.com.vn/world-cup-2026/"
+    "ket-qua-thi-dau-bong-da-world-cup-2026-moi-nhat-c860a1747405.html"
+)
+HEADERS_BROWSER = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "vi-VN,vi;q=0.9",
+    "Accept": "text/html,application/xhtml+xml",
+}
 
-# ESPN — undocumented public scoreboard API
+# Vietnamese → English team name mapping (24h.com.vn uses Vietnamese names)
+_VN_TO_EN: dict[str, str] = {
+    "Úc": "Australia",
+    "Thổ Nhĩ Kỳ": "Türkiye",
+    "Tây Ban Nha": "Spain",
+    "Cabo Verde": "Cape Verde",
+    "Bỉ": "Belgium",
+    "Ai Cập": "Egypt",
+    "Saudi Arabia": "Saudi Arabia",
+    "Ả Rập Xê Út": "Saudi Arabia",
+    "Uruguay": "Uruguay",
+    "Iran": "Iran",
+    "New Zealand": "New Zealand",
+    "Pháp": "France",
+    "Senegal": "Senegal",
+    "Iraq": "Iraq",
+    "Na Uy": "Norway",
+    "Argentina": "Argentina",
+    "Algeria": "Algeria",
+    "Áo": "Austria",
+    "Jordan": "Jordan",
+    "Bồ Đào Nha": "Portugal",
+    "Congo DR": "Congo DR",
+    "Anh": "England",
+    "Croatia": "Croatia",
+    "Ghana": "Ghana",
+    "Panama": "Panama",
+    "Uzbekistan": "Uzbekistan",
+    "Colombia": "Colombia",
+    "Séc": "Czechia",
+    "Nam Phi": "South Africa",
+    "Thụy Sĩ": "Switzerland",
+    "Bosnia-Herzegovina": "Bosnia and Herzegovina",
+    "Bosnia": "Bosnia and Herzegovina",
+    "Canada": "Canada",
+    "Qatar": "Qatar",
+    "Mexico": "Mexico",
+    "Hàn Quốc": "South Korea",
+    "Hà Lan": "Netherlands",
+    "Nhật Bản": "Japan",
+    "Đức": "Germany",
+    "Curacao": "Curaçao",
+    "Bờ Biển Ngà": "Ivory Coast",
+    "Ecuador": "Ecuador",
+    "Thụy Điển": "Sweden",
+    "Tunisia": "Tunisia",
+    "Brazil": "Brazil",
+    "Ma Rốc": "Morocco",
+    "Haiti": "Haiti",
+    "Scotland": "Scotland",
+    "Mỹ": "United States",
+    "Paraguay": "Paraguay",
+    "Bồ Đào Nha": "Portugal",
+    "Đan Mạch": "Denmark",
+    "Serbia": "Serbia",
+    "Thụy Sĩ": "Switzerland",
+    "Nigeria": "Nigeria",
+    "Cameroon": "Cameroon",
+    "Senegal": "Senegal",
+    "Maroc": "Morocco",
+    "Nga": "Russia",
+    "Ba Lan": "Poland",
+    "Romani": "Romania",
+    "Bungari": "Bulgaria",
+    "Hy Lạp": "Greece",
+    "Thổ Nhĩ Kỳ": "Türkiye",
+}
+
+
+def _en(name: str) -> str:
+    """Convert Vietnamese team name to English. Returns original if not found."""
+    return _VN_TO_EN.get(name, name)
+
+
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world"
-
 ESPN_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; 3anhem-agent/1.0)",
     "Accept": "application/json",
 }
-
-IN_PLAY_STATUSES = {"1H", "HT", "2H", "ET", "P", "LIVE", "INPLAY"}
-FINISHED_STATUSES = {"FT", "AET", "PEN", "AP", "ABD"}
 
 
 # ─── Normalised match format ────────────────────────────────────────────────
@@ -65,7 +145,135 @@ def _match(
     }
 
 
-# ─── ESPN parser ────────────────────────────────────────────────────────────
+# ─── 24h.com.vn scraper ─────────────────────────────────────────────────────
+
+def _parse_24h_item(item, current_year: int) -> dict | None:
+    """Parse one .box-items div from 24h.com.vn. Returns None if not a valid match."""
+    # Group and date/time from .box-l
+    group = ""
+    box_l = item.find(class_="box-table")
+    if box_l:
+        group = box_l.get_text(strip=True)
+
+    date_part = ""
+    time_part = ""
+    box_time = item.find(class_="box-time")
+    if box_time:
+        time_span = box_time.find("span")
+        if time_span:
+            time_part = time_span.get_text(strip=True)         # "11:00"
+            time_span.extract()
+        date_part = box_time.get_text(strip=True)              # "14/06"
+
+    # Home team: .team-name.text-right
+    home_el = item.find(class_="team-name text-right") or item.find("span", class_=lambda c: c and "team-name" in c and "text-right" in c)
+    if not home_el:
+        # Try via img alt inside first .box-clb
+        clbs = item.find_all(class_="box-clb")
+        if clbs:
+            img = clbs[0].find("img")
+            home_name = img["alt"] if img and img.get("alt") else ""
+        else:
+            return None
+    else:
+        home_name = home_el.get_text(strip=True)
+
+    # Away team: .team-name without text-right (second occurrence)
+    team_names = item.find_all("span", class_=lambda c: c and "team-name" in c)
+    away_name = ""
+    for tn in team_names:
+        cls = " ".join(tn.get("class", []))
+        if "text-right" not in cls:
+            away_name = tn.get_text(strip=True)
+            break
+    if not away_name:
+        # Fallback: img alt in second .box-clb
+        clbs = item.find_all(class_="box-clb")
+        if len(clbs) >= 2:
+            img = clbs[-1].find("img")
+            away_name = img["alt"] if img and img.get("alt") else ""
+
+    if not home_name or not away_name:
+        return None
+
+    # Score from .box-score .box-t
+    score_raw = ""
+    box_score = item.find(class_="box-score")
+    if box_score:
+        box_t = box_score.find(class_="box-t")
+        if box_t:
+            score_raw = box_t.get_text(strip=True)
+
+    # Status from .box-r text
+    box_r = item.find(class_="box-r")
+    box_r_text = box_r.get_text(strip=True).lower() if box_r else ""
+
+    # Parse score and determine status
+    home_score = away_score = None
+    score_match = re.match(r"(\d+)\s*[-:]\s*(\d+)", score_raw)
+    if score_match:
+        home_score = int(score_match.group(1))
+        away_score = int(score_match.group(2))
+        status = "FINISHED" if ("highlight" in box_r_text or "video" in box_r_text) else "IN_PLAY"
+    else:
+        status = "SCHEDULED"
+
+    # Parse date/time (VN timezone) → UTC
+    utc_date = ""
+    if date_part and time_part and re.match(r"\d{2}/\d{2}", date_part):
+        try:
+            dt_vn = datetime.strptime(
+                f"{date_part} {time_part}/{current_year}", "%d/%m %H:%M/%Y"
+            ).replace(tzinfo=VN_TZ)
+            utc_date = dt_vn.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            pass
+
+    return _match(
+        id=f"24h_{home_name}_{away_name}_{date_part}",
+        home_team=_en(home_name),
+        away_team=_en(away_name),
+        home_score=home_score,
+        away_score=away_score,
+        status=status,
+        utc_date=utc_date,
+        group=group,
+    )
+
+
+async def _fetch_24h_all(client: httpx.AsyncClient) -> list[dict] | None:
+    """Scrape 24h.com.vn. Returns all matches (unsorted) or None on failure."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return None
+
+    try:
+        resp = await client.get(
+            URL_24H,
+            headers=HEADERS_BROWSER,
+            timeout=15,
+            follow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        current_year = datetime.now(VN_TZ).year
+        all_matches: list[dict] = []
+
+        for item in soup.find_all(class_="box-items"):
+            m = _parse_24h_item(item, current_year)
+            if m:
+                all_matches.append(m)
+
+        return all_matches if all_matches else None
+
+    except Exception:
+        return None
+
+
+# ─── ESPN fallback ───────────────────────────────────────────────────────────
 
 def _espn_status(event: dict) -> str:
     state = event.get("status", {}).get("type", {}).get("state", "")
@@ -80,46 +288,39 @@ def _espn_status(event: dict) -> str:
 def _espn_parse(event: dict) -> dict:
     comp = (event.get("competitions") or [{}])[0]
     competitors = comp.get("competitors", [])
-
     home = next((c for c in competitors if c.get("homeAway") == "home"), {})
     away = next((c for c in competitors if c.get("homeAway") == "away"), {})
 
     def _score(c):
         s = c.get("score")
-        if s is None or s == "":
-            return None
         try:
-            return int(float(s))
+            return int(float(s)) if s not in (None, "") else None
         except (ValueError, TypeError):
             return None
 
     status = _espn_status(event)
-
-    venue_info = comp.get("venue", {})
-    venue = venue_info.get("fullName", "")
-
     note = comp.get("notes", [{}])
     group = note[0].get("headline", "") if note else ""
 
     return _match(
         id=event.get("id"),
-        home_team=home.get("team", {}).get("displayName") or home.get("team", {}).get("name", "?"),
-        away_team=away.get("team", {}).get("displayName") or away.get("team", {}).get("name", "?"),
+        home_team=home.get("team", {}).get("displayName") or "?",
+        away_team=away.get("team", {}).get("displayName") or "?",
         home_score=_score(home) if status != "SCHEDULED" else None,
         away_score=_score(away) if status != "SCHEDULED" else None,
         status=status,
         utc_date=event.get("date", ""),
         group=group,
-        venue=venue,
+        venue=comp.get("venue", {}).get("fullName", ""),
     )
 
 
-async def _fetch_espn_upcoming(client: httpx.AsyncClient, today: str) -> list[dict] | None:
-    """Fetch today + next 3 days in parallel to collect up to 5 upcoming/live matches."""
-    days = [
-        (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=d)).strftime("%Y%m%d")
-        for d in range(4)
-    ]
+async def _fetch_espn_all(client: httpx.AsyncClient) -> dict[tuple, dict] | None:
+    """Fetch ESPN scores for UTC today ± 5 days.
+    Returns lookup dict keyed by (home_team_lower, away_team_lower), or None on failure."""
+    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    base = datetime.strptime(today_utc, "%Y-%m-%d")
+    days = [(base + timedelta(days=d)).strftime("%Y%m%d") for d in range(-5, 5)]
 
     async def _day(ds: str) -> list[dict]:
         try:
@@ -130,125 +331,49 @@ async def _fetch_espn_upcoming(client: httpx.AsyncClient, today: str) -> list[di
                 timeout=12,
             )
             if r.status_code == 200:
-                return [
-                    _espn_parse(e)
-                    for e in (r.json().get("events") or [])
-                    if _espn_status(e) != "FINISHED"
-                ]
+                return [_espn_parse(e) for e in (r.json().get("events") or [])]
         except Exception:
             pass
         return []
 
-    day_results = await asyncio.gather(*[_day(d) for d in days])
-    upcoming = [m for day in day_results for m in day]
-    return upcoming[:5] if upcoming else None
+    results = await asyncio.gather(*[_day(d) for d in days])
+    lookup: dict[tuple, dict] = {}
+    for day_matches in results:
+        for m in day_matches:
+            key = (m["home_team"].lower(), m["away_team"].lower())
+            lookup[key] = m
+    return lookup if lookup else None
 
 
-async def _fetch_espn_recent(client: httpx.AsyncClient, today: str) -> list[dict]:
-    """Fetch past 5 days from ESPN to get up to 5 recent results."""
-    results = []
-    try:
-        for delta in range(1, 6):
-            past_day = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=delta)).strftime("%Y%m%d")
-            resp = await client.get(
-                f"{ESPN_BASE}/scoreboard",
-                params={"dates": past_day},
-                headers=ESPN_HEADERS,
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                for e in (data.get("events") or []):
-                    m = _espn_parse(e)
-                    if m["status"] == "FINISHED":
-                        results.append(m)
-            if len(results) >= 5:
-                break
-    except Exception:
-        pass
-    return results[:5]
+# ─── Merge helpers ──────────────────────────────────────────────────────────
 
-
-# ─── TheSportsDB parser ──────────────────────────────────────────────────────
-
-def _sportsdb_status(raw: str) -> str:
-    s = (raw or "").upper()
-    if s in FINISHED_STATUSES:
-        return "FINISHED"
-    if s in IN_PLAY_STATUSES:
-        return "IN_PLAY"
-    return "SCHEDULED"
-
-
-def _sportsdb_parse(e: dict) -> dict:
-    def _score(v):
-        if v is None or v == "" or str(v).lower() == "null":
-            return None
-        try:
-            return int(float(v))
-        except (ValueError, TypeError):
-            return None
-
-    date_str = e.get("dateEvent", "")
-    time_str = (e.get("strTime") or "00:00:00").strip()
-    utc_date = f"{date_str}T{time_str}Z" if date_str else ""
-    status = _sportsdb_status(e.get("strStatus", ""))
-
-    return _match(
-        id=e.get("idEvent"),
-        home_team=e.get("strHomeTeam", "?"),
-        away_team=e.get("strAwayTeam", "?"),
-        home_score=_score(e.get("intHomeScore")) if status != "SCHEDULED" else None,
-        away_score=_score(e.get("intAwayScore")) if status != "SCHEDULED" else None,
-        status=status,
-        utc_date=utc_date,
-        group=e.get("strRound") or str(e.get("intRound") or ""),
-        venue=e.get("strVenue", ""),
+def _split(matches: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Split match list into (upcoming[:5], recent[:5]) sorted by utc_date."""
+    finished = sorted(
+        [m for m in matches if m["status"] == "FINISHED"],
+        key=lambda m: m["utc_date"], reverse=True,
     )
-
-
-async def _fetch_sportsdb(client: httpx.AsyncClient, today: str):
-    """Fetch today + recent from TheSportsDB. Returns (today_list, recent_list)."""
-    async def _get(url, params=None):
-        try:
-            r = await client.get(url, params=params, timeout=12)
-            return r.json() if r.status_code == 200 else {}
-        except Exception:
-            return {}
-
-    r_day, r_next, r_past = await asyncio.gather(
-        _get(f"{SPORTSDB_BASE}/eventsday.php", {"d": today}),
-        _get(f"{SPORTSDB_BASE}/eventsnextleague.php", {"id": SPORTSDB_LEAGUE_ID}),
-        _get(f"{SPORTSDB_BASE}/eventspastleague.php", {"id": SPORTSDB_LEAGUE_ID}),
+    upcoming = sorted(
+        [m for m in matches if m["status"] != "FINISHED"],
+        key=lambda m: m["utc_date"],
     )
+    return upcoming[:5], finished[:5]
 
-    today_events: list[dict] = []
-    seen: set = set()
 
-    for e in (r_day.get("events") or []):
-        if e.get("idLeague") == SPORTSDB_LEAGUE_ID or "World Cup" in (e.get("strLeague") or ""):
-            eid = e.get("idEvent")
-            if eid not in seen:
-                seen.add(eid)
-                today_events.append(_sportsdb_parse(e))
-
-    # Include upcoming matches from next-league (not just today)
-    for e in (r_next.get("events") or []):
-        eid = e.get("idEvent")
-        if eid not in seen:
-            seen.add(eid)
-            today_events.append(_sportsdb_parse(e))
-
-    # Keep only scheduled/live, up to 5
-    upcoming_events = [m for m in today_events if m["status"] != "FINISHED"][:5]
-
-    recent = [
-        _sportsdb_parse(e)
-        for e in (r_past.get("events") or [])
-        if e.get("dateEvent") != today
-    ][:5]
-
-    return upcoming_events, recent
+def _overlay_espn(matches: list[dict], espn: dict[tuple, dict]) -> list[dict]:
+    """Overlay ESPN score/status onto each 24h match. Keeps 24h schedule info."""
+    result = []
+    for m in matches:
+        key = (m["home_team"].lower(), m["away_team"].lower())
+        em = espn.get(key)
+        if em:
+            m = dict(m)
+            m["status"] = em["status"]
+            m["status_label"] = em["status_label"]
+            m["home_score"] = em["home_score"]
+            m["away_score"] = em["away_score"]
+        result.append(m)
+    return result
 
 
 # ─── Main endpoint ───────────────────────────────────────────────────────────
@@ -259,28 +384,26 @@ async def today_matches():
 
     try:
         async with httpx.AsyncClient() as client:
-            # Try ESPN first (parallel: upcoming from today+next days, and recent)
-            espn_upcoming, espn_recent = await asyncio.gather(
-                _fetch_espn_upcoming(client, today),
-                _fetch_espn_recent(client, today),
+            # Fetch both sources in parallel
+            matches_24h, espn_lookup = await asyncio.gather(
+                _fetch_24h_all(client),
+                _fetch_espn_all(client),
             )
 
-            if espn_upcoming is not None:
-                return {
-                    "upcoming": espn_upcoming,
-                    "recent": espn_recent,
-                    "source": "espn",
-                    "as_of": today,
-                }
+            if matches_24h:
+                # 24h provides schedule; ESPN overlays real-time scores
+                merged = _overlay_espn(matches_24h, espn_lookup or {})
+                upcoming, recent = _split(merged)
+                source = "24h+espn" if espn_lookup else "24h"
+                return {"upcoming": upcoming, "recent": recent, "source": source, "as_of": today}
 
-            # Fallback: TheSportsDB
-            sdb_upcoming, sdb_recent = await _fetch_sportsdb(client, today)
-            return {
-                "upcoming": sdb_upcoming,
-                "recent": sdb_recent,
-                "source": "thesportsdb",
-                "as_of": today,
-            }
+            if espn_lookup:
+                # 24h unavailable — fall back to ESPN standalone
+                espn_matches = list(espn_lookup.values())
+                upcoming, recent = _split(espn_matches)
+                return {"upcoming": upcoming, "recent": recent, "source": "espn", "as_of": today}
 
     except Exception as exc:
         return {"upcoming": [], "recent": [], "source": "error", "error": str(exc)}
+
+    return {"upcoming": [], "recent": [], "source": "none", "as_of": today}

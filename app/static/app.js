@@ -654,9 +654,19 @@ function _tickCountdowns() {
   document.querySelectorAll('.match-countdown[data-utc]').forEach(el => {
     const diff = new Date(el.dataset.utc).getTime() - now;
     if (diff <= 0) {
-      el.innerHTML = '⚽ Đang diễn ra';
+      el.innerHTML = '🔴 LIVE';
       el.style.background = 'rgba(34,197,94,0.15)';
       el.style.color = '#22c55e';
+      // Update status badge in the same match-item to "Đang diễn ra"
+      const matchItem = el.closest('.match-item');
+      if (matchItem) {
+        const badge = matchItem.querySelector('.status-badge');
+        if (badge && badge.textContent.trim() === 'Sắp diễn ra') {
+          badge.textContent = 'Đang diễn ra';
+          badge.classList.remove('scheduled');
+          badge.classList.add('in-play');
+        }
+      }
       return;
     }
     const h = Math.floor(diff / 3600000);
@@ -818,7 +828,7 @@ function renderMatch(m) {
   const metaHtml = m.status !== 'FINISHED' ? `
     <div class="match-meta">
       <span class="status-badge ${statusClass}">${m.status_label}</span>
-      ${m.local_time ? ` · ${m.local_time} (giờ VN)` : ''}
+      ${m.local_time ? ` · ${m.local_time}` : ''}
       ${m.group ? ` · ${m.group}` : ''}
     </div>` : '';
 
