@@ -109,6 +109,17 @@ def create_pull_request_sync(
         return f"PR #{data['number']} created: {data['html_url']}"
 
 
+def _pull_latest(repo_path, branch: str = ""):
+    """Pull latest changes so rule files are always up-to-date."""
+    try:
+        args = ["git", "-C", str(repo_path), "pull", "--rebase", "--autostash"]
+        if branch:
+            args += ["origin", branch]
+        subprocess.run(args, capture_output=True, timeout=30)
+    except Exception:
+        pass
+
+
 def _read_rule(repo_id: int, rule_path: str) -> str | None:
     """Read a rule file from the repo. Returns content if non-empty, None otherwise."""
     full = get_repo_path(repo_id) / rule_path
@@ -169,30 +180,25 @@ async def process_push_event(repo_id: int, event_id: int, commit: dict):
         repo = result.scalar_one_or_none()
         if not repo:
             return
-
-        # Check rules/review.md — skip if missing or empty
-        rule = _read_rule(repo_id, "rules/review.md")
-        if rule is None:
-            ev_result = await db.execute(select(WebhookEvent).where(WebhookEvent.id == event_id))
-            ev = ev_result.scalar_one_or_none()
-            if ev:
-                ev.processed = True
-                ev.result = "skipped: rules/review.md missing or empty"
-                await db.commit()
-            return
-
+        github_url = repo.github_url
+        main_branch = repo.main_branch
         token = None
         if repo.github_token_encrypted:
             from app.crypto import decrypt_token
             token = decrypt_token(repo.github_token_encrypted)
 
-        sha = commit.get("id", "")
-        diff = await get_commit_diff(repo.github_url, sha, token)
-        review = await _generate_review(diff, "commit", rule)
+    # Pull latest so rules files are fresh, then read rule (None → use default criteria)
+    _pull_latest(get_repo_path(repo_id), main_branch)
+    rule = _read_rule(repo_id, "rules/review.md")
 
-        if review and token:
-            await post_commit_comment(repo.github_url, sha, review, token)
+    sha = commit.get("id", "")
+    diff = await get_commit_diff(github_url, sha, token)
+    review = await _generate_review(diff, "commit", rule)
 
+    if review and token:
+        await post_commit_comment(github_url, sha, review, token)
+
+    async with AsyncSessionLocal() as db:
         ev_result = await db.execute(select(WebhookEvent).where(WebhookEvent.id == event_id))
         ev = ev_result.scalar_one_or_none()
         if ev:
@@ -211,30 +217,25 @@ async def process_pr_event(repo_id: int, event_id: int, payload: dict):
         repo = result.scalar_one_or_none()
         if not repo:
             return
-
-        # Check rules/review.md — skip if missing or empty
-        rule = _read_rule(repo_id, "rules/review.md")
-        if rule is None:
-            ev_result = await db.execute(select(WebhookEvent).where(WebhookEvent.id == event_id))
-            ev = ev_result.scalar_one_or_none()
-            if ev:
-                ev.processed = True
-                ev.result = "skipped: rules/review.md missing or empty"
-                await db.commit()
-            return
-
+        github_url = repo.github_url
+        main_branch = repo.main_branch
         token = None
         if repo.github_token_encrypted:
             from app.crypto import decrypt_token
             token = decrypt_token(repo.github_token_encrypted)
 
-        pr_number = payload.get("pull_request", {}).get("number")
-        diff = await get_pr_diff(repo.github_url, pr_number, token)
-        review = await _generate_review(diff, f"pull request #{pr_number}", rule)
+    # Pull latest so rules files are fresh, then read rule (None → use default criteria)
+    _pull_latest(get_repo_path(repo_id), main_branch)
+    rule = _read_rule(repo_id, "rules/review.md")
 
-        if review and token and pr_number:
-            await post_pr_review(repo.github_url, pr_number, review, token)
+    pr_number = payload.get("pull_request", {}).get("number")
+    diff = await get_pr_diff(github_url, pr_number, token)
+    review = await _generate_review(diff, f"pull request #{pr_number}", rule)
 
+    if review and token and pr_number:
+        await post_pr_review(github_url, pr_number, review, token)
+
+    async with AsyncSessionLocal() as db:
         ev_result = await db.execute(select(WebhookEvent).where(WebhookEvent.id == event_id))
         ev = ev_result.scalar_one_or_none()
         if ev:
@@ -260,6 +261,10 @@ async def process_docs_update(repo_id: int, payload: dict):
         github_token_encrypted = repo.github_token_encrypted
         main_branch = repo.main_branch
 
+    # Pull latest so rule files are fresh
+    repo_path = get_repo_path(repo_id)
+    _pull_latest(repo_path, main_branch)
+
     # Check rules/docs.md — skip if missing or empty
     rule_content = _read_rule(repo_id, "rules/docs.md")
     if rule_content is None:
@@ -267,8 +272,6 @@ async def process_docs_update(repo_id: int, payload: dict):
 
     if not settings.LLM_API_KEY:
         return
-
-    repo_path = get_repo_path(repo_id)
 
     # Gather changed files from the push (exclude rules/ and docs/ themselves).
     # Merge commits on GitHub typically have empty added/modified lists, so fall back
@@ -317,17 +320,22 @@ async def process_docs_update(repo_id: int, payload: dict):
         temperature=0.2,
     )
 
+    import json as _json
+
     system_content = (
         "You are a technical documentation writer. "
-        "You MUST follow the documentation rules below EXACTLY — match the structure, format, and style as specified. "
+        "You MUST follow the DOCUMENTATION RULES below EXACTLY — match the structure, file path, format, and style as specified. "
         "Do NOT deviate from these rules.\n\n"
-        f"DOCUMENTATION RULES (follow EXACTLY):\n{rule_content}"
+        f"DOCUMENTATION RULES (follow EXACTLY):\n{rule_content}\n\n"
+        "RESPONSE FORMAT: You MUST respond with ONLY a valid JSON object, no markdown fences, no explanation:\n"
+        '{"path": "relative/path/to/file.md", "content": "markdown content here"}\n'
+        "The 'path' field MUST follow what the documentation rules specify (e.g. README.md, docs/API.md, etc.). "
+        "If the rules do not specify a path, use \"docs/AUTO_GENERATED.md\"."
     )
 
     prompt = (
         "Write or update documentation for these changed files:\n\n"
         + "\n\n".join(file_summaries)
-        + "\n\nReturn ONLY the markdown documentation content."
     )
 
     try:
@@ -335,13 +343,22 @@ async def process_docs_update(repo_id: int, payload: dict):
             SystemMessage(content=system_content),
             HumanMessage(content=prompt),
         ])
-        doc_content = resp.content
+        raw = resp.content.strip()
+        # Strip markdown fences if LLM wraps response anyway
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        parsed = _json.loads(raw)
+        doc_path = parsed.get("path", "docs/AUTO_GENERATED.md").lstrip("/")
+        doc_content = parsed.get("content", "")
     except Exception:
         return
 
-    # Ensure docs/ directory exists (create if absent), write doc, push directly to main
-    docs_dir = repo_path / "docs"
-    doc_file = docs_dir / "AUTO_GENERATED.md"
+    if not doc_content:
+        return
+
     try:
         from app.crypto import decrypt_token
         token = decrypt_token(github_token_encrypted)
@@ -354,31 +371,30 @@ async def process_docs_update(repo_id: int, payload: dict):
                 "GIT_COMMITTER_NAME": settings.AGENT_BOT_LOGIN,
                 "GIT_COMMITTER_EMAIL": "bot@3anhem.local",
             }
-            # Always work on main branch to avoid conflicts with chat agent feature branches
             subprocess.run(["git", "-C", str(repo_path), "checkout", main_branch], capture_output=True, env=env)
             subprocess.run(
                 ["git", "-C", str(repo_path), "pull", "--rebase", "origin", main_branch],
                 capture_output=True, env=env,
             )
-            docs_dir.mkdir(parents=True, exist_ok=True)
-            doc_file.write_text(doc_content)
-            subprocess.run(["git", "-C", str(repo_path), "add", "docs/"], check=True, env=env)
+            # Write to the path the LLM determined from rules/docs.md
+            out_file = repo_path / doc_path
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            out_file.write_text(doc_content)
+            subprocess.run(["git", "-C", str(repo_path), "add", str(out_file.relative_to(repo_path))], check=True, env=env)
             commit_result = subprocess.run(
                 ["git", "-C", str(repo_path), "commit", "-m",
                  f"{settings.AGENT_COMMIT_PREFIX} Update documentation"],
                 capture_output=True, env=env,
             )
-            # Return code 1 means "nothing to commit" — not an error
             if commit_result.returncode not in (0, 1):
                 commit_result.check_returncode()
             if commit_result.returncode != 0:
-                return  # nothing changed, no push needed
+                return
             remote = github_url
             if "https://" in remote and token:
                 from urllib.parse import urlparse
-                parsed = urlparse(remote)
-                remote = remote.replace(f"{parsed.scheme}://", f"{parsed.scheme}://{github_username}:{token}@")
-            # Push directly to main — docs webhook is allowed to bypass branch protection
+                parsed_url = urlparse(remote)
+                remote = remote.replace(f"{parsed_url.scheme}://", f"{parsed_url.scheme}://{github_username}:{token}@")
             subprocess.run(["git", "-C", str(repo_path), "push", remote, f"HEAD:{main_branch}"], check=True, env=env)
 
         await asyncio.get_event_loop().run_in_executor(None, _git_push)
