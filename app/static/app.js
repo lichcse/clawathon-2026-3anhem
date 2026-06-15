@@ -639,8 +639,7 @@ function _scheduleWcRefresh(data) {
   if (_wcRefreshTimer) clearTimeout(_wcRefreshTimer);
   const allMatches = [...(data?.upcoming || data?.today || []), ...(data?.recent || [])];
   const hasLive = allMatches.some(m => m.status === 'IN_PLAY');
-  // 5 min when live match is on, 30 min otherwise
-  _wcRefreshTimer = setTimeout(loadWorldCup, hasLive ? 5 * 60 * 1000 : 30 * 60 * 1000);
+  _wcRefreshTimer = setTimeout(loadWorldCup, 10 * 60 * 1000);
 }
 
 function startCountdowns() {

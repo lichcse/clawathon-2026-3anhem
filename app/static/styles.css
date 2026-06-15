@@ -720,14 +720,14 @@ body {
 
 /* ─── Chat Bottom ─── */
 #chat-bottom {
-  padding: 10px 20px 14px;
+  padding: 17px 20px 14px;
   border-top: 1px solid rgba(48,54,61,0.6);
   background: rgba(13,17,23,0.88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
-.suggestions { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.suggestions { display: flex; gap: 6px; margin-top: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .suggestion-chip {
   padding: 5px 14px;
   background: rgba(33,38,45,0.92);

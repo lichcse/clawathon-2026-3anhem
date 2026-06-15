@@ -114,7 +114,7 @@ def _match(
 ) -> dict:
     status_label = {
         "SCHEDULED": "Sắp diễn ra",
-        "IN_PLAY": "LIVE",
+        "IN_PLAY": "Đang diễn ra",
         "FINISHED": "Kết thúc",
     }.get(status, status)
 
