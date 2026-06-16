@@ -57,6 +57,14 @@ async function loadRepos() {
   try {
     const repos = await api('GET', '/api/repos');
     renderRepos(repos);
+    // Auto-select repo from URL on first load
+    if (!currentRepoId && repos.length) {
+      const params = new URLSearchParams(window.location.search);
+      const repoIdFromUrl = parseInt(params.get('repo'));
+      if (repoIdFromUrl && repos.find(r => r.id === repoIdFromUrl)) {
+        await selectRepo(repoIdFromUrl);
+      }
+    }
   } catch (e) {
     document.getElementById('repo-list').innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px;">Error: ${e.message}</div>`;
   }
@@ -80,6 +88,7 @@ function renderRepos(repos) {
 
 async function selectRepo(id) {
   currentRepoId = id;
+  history.replaceState(null, '', `?repo=${id}`);
   try {
     currentRepo = await api('GET', `/api/repos/${id}`);
     document.getElementById('current-repo-label').innerHTML =
