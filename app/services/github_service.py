@@ -11,6 +11,19 @@ from app.services.git_service import get_repo_path, read_file
 settings = get_settings()
 
 
+def _strip_json_fences(text: str) -> str:
+    """Remove markdown code fences from LLM JSON response safely."""
+    text = text.strip()
+    if text.startswith("```"):
+        parts = text.split("```")
+        if len(parts) >= 2:
+            text = parts[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+    return text
+
+
 def _github_headers(token: str = None) -> dict:
     h = {"Accept": "application/vnd.github.v3+json"}
     if token:
@@ -151,7 +164,7 @@ async def _generate_review(diff: str, context: str, rule: str = "") -> str:
             "Review the provided diff STRICTLY following the project rules below. "
             "Do NOT apply generic criteria outside of these rules — the rules define exactly what to check.\n\n"
             f"PROJECT REVIEW RULES (follow EXACTLY):\n{rule}\n\n"
-            "Format: concise markdown list. Be specific with file and line references. Maximum 400 words."
+            "Format: concise markdown list. Be specific with file and line references."
         )
     else:
         system = (
@@ -160,14 +173,43 @@ async def _generate_review(diff: str, context: str, rule: str = "") -> str:
             "2. Security vulnerabilities (injection, hardcoded secrets, etc.)\n"
             "3. Performance concerns\n"
             "4. Code quality issues (naming, duplication, missing error handling)\n\n"
-            "Format: concise markdown list. Maximum 400 words. Be specific with file and line references."
+            "Format: concise markdown list. Be specific with file and line references."
         )
     user = f"Review this {context}:\n\n{diff[:6000]}"
     try:
         resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
-        return f"🤖 **Automated Code Review by 3 ANH EM Code Agent - AI-powered code review & assistant**\n\n{resp.content}"
+        draft = resp.content
     except Exception as e:
         return f"Review generation failed: {e}"
+
+    # Verification pass: check draft is complete before posting
+    criteria = rule if rule else (
+        "1. Potential bugs or logic errors\n"
+        "2. Security vulnerabilities (injection, hardcoded secrets, etc.)\n"
+        "3. Performance concerns\n"
+        "4. Code quality issues (naming, duplication, missing error handling)"
+    )
+    try:
+        verify_system = (
+            "You are a strict code review quality checker. "
+            "Your job is to verify that a review is complete and fully covers all criteria.\n\n"
+            f"REVIEW CRITERIA:\n{criteria}"
+        )
+        verify_user = (
+            f"Here is the generated review:\n\n{draft}\n\n"
+            "Does this review fully cover EVERY criterion listed above? "
+            "If YES, reply with exactly: COMPLIANT\n"
+            "If NO, reply with the COMPLETE corrected review that covers all missing criteria "
+            "(not just the missing parts — the full review)."
+        )
+        v_resp = await llm.ainvoke([SystemMessage(content=verify_system), HumanMessage(content=verify_user)])
+        verified = v_resp.content.strip()
+        if not verified.upper().startswith("COMPLIANT"):
+            draft = verified
+    except Exception:
+        pass  # use original draft if verification fails
+
+    return f"🤖 **Automated Code Review by 3 ANH EM Code Agent - AI-powered code review & assistant**\n\n{draft}"
 
 
 async def process_push_event(repo_id: int, event_id: int, commit: dict):
@@ -343,13 +385,7 @@ async def process_docs_update(repo_id: int, payload: dict):
             SystemMessage(content=system_content),
             HumanMessage(content=prompt),
         ])
-        raw = resp.content.strip()
-        # Strip markdown fences if LLM wraps response anyway
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
+        raw = _strip_json_fences(resp.content.strip())
         parsed = _json.loads(raw)
         doc_path = parsed.get("path", "docs/AUTO_GENERATED.md").lstrip("/")
         doc_content = parsed.get("content", "")
@@ -358,6 +394,34 @@ async def process_docs_update(repo_id: int, payload: dict):
 
     if not doc_content:
         return
+
+    # Verification pass: check docs completeness against rules before pushing
+    try:
+        verify_system = (
+            "You are a strict documentation quality checker. "
+            "Verify that the generated documentation fully satisfies ALL requirements in the rules below.\n\n"
+            f"DOCUMENTATION RULES:\n{rule_content}"
+        )
+        verify_user = (
+            f"Generated documentation (file: {doc_path}):\n\n{doc_content}\n\n"
+            "Does this documentation fully satisfy EVERY requirement in the rules? "
+            "If YES, reply with exactly: COMPLIANT\n"
+            "If NO, reply with a JSON object containing the COMPLETE corrected documentation "
+            "(same format as before): "
+            '{"path": "...", "content": "complete corrected content"}'
+        )
+        v_resp = await llm.ainvoke([SystemMessage(content=verify_system), HumanMessage(content=verify_user)])
+        verified = v_resp.content.strip()
+        if not verified.upper().startswith("COMPLIANT"):
+            # Try to parse corrected JSON from verifier
+            try:
+                v_parsed = _json.loads(_strip_json_fences(verified))
+                doc_path = v_parsed.get("path", doc_path).lstrip("/")
+                doc_content = v_parsed.get("content", doc_content)
+            except Exception:
+                pass  # keep original if verifier response is not valid JSON
+    except Exception:
+        pass  # proceed with original if verification call fails
 
     try:
         from app.crypto import decrypt_token

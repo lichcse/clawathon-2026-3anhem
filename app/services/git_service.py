@@ -371,7 +371,10 @@ def push_branch(repo_id: int, branch: str, github_url: str, username: str, encry
             capture_output=True, text=True, env=env,
         )
         if result.returncode != 0:
-            return f"Push failed: {result.stderr.strip()}"
+            err = result.stderr.strip()
+            if token:
+                err = err.replace(token, "***")
+            return f"Push failed: {err}"
         return f"Pushed to '{branch}' successfully."
     except Exception as e:
         return f"Error: {e}"

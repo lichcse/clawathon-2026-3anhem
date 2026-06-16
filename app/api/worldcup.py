@@ -376,11 +376,22 @@ def _overlay_espn(matches: list[dict], espn: dict[tuple, dict]) -> list[dict]:
     return result
 
 
+# ─── Cache (30-minute TTL) ───────────────────────────────────────────────────
+
+_cache: dict = {}
+_CACHE_TTL = timedelta(minutes=30)
+
+
 # ─── Main endpoint ───────────────────────────────────────────────────────────
 
 @router.get("/worldcup/today")
 async def today_matches():
-    today = datetime.now(VN_TZ).strftime("%Y-%m-%d")
+    now = datetime.now(VN_TZ)
+    today = now.strftime("%Y-%m-%d")
+
+    cached = _cache.get("data")
+    if cached and cached.get("as_of") == today and (now - cached["_fetched_at"]) < _CACHE_TTL:
+        return {k: v for k, v in cached.items() if k != "_fetched_at"}
 
     try:
         async with httpx.AsyncClient() as client:
@@ -391,17 +402,19 @@ async def today_matches():
             )
 
             if matches_24h:
-                # 24h provides schedule; ESPN overlays real-time scores
                 merged = _overlay_espn(matches_24h, espn_lookup or {})
                 upcoming, recent = _split(merged)
                 source = "24h+espn" if espn_lookup else "24h"
-                return {"upcoming": upcoming, "recent": recent, "source": source, "as_of": today}
+                result = {"upcoming": upcoming, "recent": recent, "source": source, "as_of": today, "_fetched_at": now}
+                _cache["data"] = result
+                return {k: v for k, v in result.items() if k != "_fetched_at"}
 
             if espn_lookup:
-                # 24h unavailable — fall back to ESPN standalone
                 espn_matches = list(espn_lookup.values())
                 upcoming, recent = _split(espn_matches)
-                return {"upcoming": upcoming, "recent": recent, "source": "espn", "as_of": today}
+                result = {"upcoming": upcoming, "recent": recent, "source": "espn", "as_of": today, "_fetched_at": now}
+                _cache["data"] = result
+                return {k: v for k, v in result.items() if k != "_fetched_at"}
 
     except Exception as exc:
         return {"upcoming": [], "recent": [], "source": "error", "error": str(exc)}
