@@ -20,7 +20,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /* ─── User ─── */
 async function initUser() {
-  try { await api('GET', '/api/me'); } catch (e) { /* cookie will be set */ }
+  try {
+    const storedId = localStorage.getItem('user_id');
+    const url = storedId ? `/api/me?stored_id=${encodeURIComponent(storedId)}` : '/api/me';
+    const data = await api('GET', url);
+    if (data && data.user_id) {
+      localStorage.setItem('user_id', data.user_id);
+    }
+  } catch (e) { /* cookie will be set */ }
 }
 
 /* ─── API helper ─── */
