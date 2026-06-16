@@ -1,0 +1,14 @@
+id: load_csv
+name: Load CSV
+description: Read a CSV file from disk into a dataframe (written to disk as parquet).
+version: 0.1.0
+inputs: {}
+params:
+  path:
+    type: string
+    description: Absolute path to the CSV file on disk.
+    required: true
+outputs:
+  data:
+    type: dataframe
+    description: Parsed dataframe, serialized as parquet on disk.

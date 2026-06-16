@@ -1,0 +1,22 @@
+id: export_xlsx
+name: Export to Excel
+description: Write a dataframe to an .xlsx file (no template — plain table export).
+version: 0.1.0
+inputs:
+  data:
+    type: dataframe
+    description: The dataframe to export.
+    required: true
+params:
+  filename:
+    type: string
+    description: Output filename (without directory). Defaults to output.xlsx.
+    required: false
+  sheet_name:
+    type: string
+    description: Sheet name for the exported table. Defaults to Sheet1.
+    required: false
+outputs:
+  file:
+    type: xlsx_file
+    description: Path to the produced xlsx file.

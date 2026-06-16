@@ -1,5 +1,11 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.1
+sqlmodel>=0.0.22
+anthropic>=0.40
+pandas>=2.2
+openpyxl>=3.1
+pyarrow>=17
+pyyaml>=6
 sqlalchemy==2.0.31
 aiosqlite==0.20.0
 greenlet==3.0.3

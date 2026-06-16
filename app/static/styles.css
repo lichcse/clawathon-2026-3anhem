@@ -177,6 +177,32 @@ body {
 }
 #add-repo-btn .plus { font-size: 15px; font-weight: 700; color: var(--green); }
 
+#mvp-btn {
+  margin: 6px 10px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255,167,38,0.06);
+  border: 1px dashed rgba(255,167,38,0.4);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  width: calc(100% - 20px);
+  transition: all .15s;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+#mvp-btn:hover {
+  background: rgba(255,167,38,0.12);
+  border-color: rgba(255,167,38,0.8);
+  color: #ffa726;
+  box-shadow: 0 0 12px rgba(255,167,38,0.25);
+}
+#mvp-btn .plus { font-size: 14px; color: #ffa726; }
+
 /* ─── Sidebar Footer ─── */
 #sidebar-footer {
   padding: 12px 14px 14px;

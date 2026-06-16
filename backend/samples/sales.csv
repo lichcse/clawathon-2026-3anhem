@@ -1,0 +1,13 @@
+region,product,quantity,sales
+North,Widget,10,1000
+North,Gadget,5,750
+North,Doohickey,8,1200
+South,Widget,7,700
+South,Gadget,3,450
+South,Doohickey,4,600
+East,Widget,12,1200
+East,Gadget,8,1200
+East,Doohickey,11,1650
+West,Widget,4,400
+West,Gadget,6,900
+West,Doohickey,9,1350
