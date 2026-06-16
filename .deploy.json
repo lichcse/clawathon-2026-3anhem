@@ -1,0 +1,25 @@
+{
+  "runtime": {
+    "name": "3anhem-agent",
+    "id": "runtime-ab14b14d-77dd-4f33-bc5f-dcbbcf4f9e6f"
+  },
+  "registry": {
+    "url": "vcr.vngcloud.vn",
+    "repo": "111480-abp111764",
+    "image": "3anhem-agent"
+  },
+  "build": {
+    "platform": "linux/amd64",
+    "envFile": ".env"
+  },
+  "flavor": "runtime-s2-general-4x8",
+  "network": {
+    "mode": "PUBLIC"
+  },
+  "autoscaling": {
+    "minReplicas": 1,
+    "maxReplicas": 1,
+    "cpuScaleThreshold": 60,
+    "memScaleThreshold": 70
+  }
+}
