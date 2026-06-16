@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>3 ANH EM Code Agent</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
 <link rel="stylesheet" href="/static/styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
@@ -69,11 +70,10 @@
       <button id="sidebar-show-btn" class="icon-btn" onclick="toggleSidebar()" title="Mở sidebar" style="display:none;margin-right:6px;">☰</button>
       <div class="repo-dropdown" id="current-repo-label">
         <span>Select a repository</span>
-        <span style="color:var(--text-2)">▾</span>
       </div>
       <div class="chat-actions">
         <select id="model-selector" onchange="selectedModel=this.value" title="Select AI model"></select>
-        <button onclick="clearHistory()" title="Clear chat history">🗑 Clear</button>
+        <button id="clear-btn" onclick="clearHistory()" title="Clear chat history" style="display:none;">🗑 Clear</button>
         <button id="wc-toggle-btn" class="icon-btn wc-toggle-btn" onclick="toggleWorldCupSidebar()" title="Vui cùng World Cup 2026">⚽</button>
       </div>
     </div>

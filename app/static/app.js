@@ -92,7 +92,7 @@ async function selectRepo(id) {
   try {
     currentRepo = await api('GET', `/api/repos/${id}`);
     document.getElementById('current-repo-label').innerHTML =
-      `<span>${currentRepo.name}</span><span style="color:var(--text-2)">▾</span>`;
+      `<span>${currentRepo.name}</span>`;
     loadRepos(); // refresh statuses
     showChatArea();
     await loadHistory();
@@ -111,16 +111,19 @@ function showChatArea() {
 
 function _setChatHasMessages(has) {
   const ca = document.getElementById('chat-area');
+  const clearBtn = document.getElementById('clear-btn');
   if (has) {
     ca.classList.remove('empty');
     ca.classList.add('has-messages');
     document.getElementById('empty-hint').style.display = 'none';
     document.getElementById('messages').style.display = 'flex';
+    if (clearBtn) clearBtn.style.display = '';
   } else {
     ca.classList.remove('has-messages');
     ca.classList.add('empty');
     document.getElementById('empty-hint').style.display = 'block';
     document.getElementById('messages').style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
   }
 }
 

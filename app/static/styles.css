@@ -102,18 +102,27 @@ body {
 }
 
 #sidebar-header {
-  padding: 14px 12px 12px;
+  height: 52px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 .app-logo {
   font-size: 18px;
   color: var(--primary);
   filter: drop-shadow(0 0 6px rgba(88,166,255,.5));
-  line-height: 1;
   flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 4px;
 }
 #sidebar-header .app-name {
   font-weight: 700;
@@ -308,11 +317,14 @@ body {
 }
 
 #chat-header {
-  padding: 11px 20px;
+  height: 52px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  box-sizing: border-box;
   background: rgba(13,17,23,0.97);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -859,10 +871,15 @@ body {
 }
 
 #wc-header {
-  padding: 13px 14px 11px;
+  height: 52px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 #wc-header h3 {
   font-size: 11px;
