@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>3 ANH EM — Code Review Agent</title>
+<title>3 ANH EM Code Agent</title>
 <link rel="stylesheet" href="/static/styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
@@ -82,17 +82,18 @@
       <div id="welcome">
         <div class="welcome-card">
           <div class="welcome-icon">⬡</div>
-          <h2>3 ANH EM Code Agent</h2>
-          <div class="welcome-sub">// AI-powered code review &amp; assistant</div>
-          <p>Hỏi đáp về code · Review commit &amp; PR · Tạo branch · Thêm &amp; sửa code · Tạo Merge Request</p>
+          <h2>3 ANH EM code agent</h2>
+          <div class="welcome-sub">// Just ask. No code needed.</div>
+          <p>Hỏi đáp · Tạo code · Refactor · Viết docs</p>
           <div class="welcome-badge">branch-protected · webhook-ready · multi-repo</div>
         </div>
       </div>
 
       <!-- Repo selected, no messages yet -->
       <div id="empty-hint" style="display:none;">
-        <p class="empty-quote">Ngay cả khi bạn không biết code, bạn vẫn có thể tạo ra sản phẩm tuyệt vời cùng 3 ANH EM Code Agent</p>
-        <p class="empty-sub">// ask anything about the repository</p>
+        <p class="empty-quote">Cứ nói. Agent hiểu dự án, viết code, lo luôn tài liệu.</p>
+
+        <p class="welcome-sub">You imagine it. AI builds it.</p>
       </div>
 
       <!-- Messages -->
@@ -101,17 +102,17 @@
       <!-- Input bar (centered when empty, pinned to bottom when chatting) -->
       <div id="chat-bottom" style="display:none;">
         <div class="suggestions" id="suggestions">
-          <button class="suggestion-chip" onclick="sendSuggestion('Mô tả cấu trúc thư mục của repo này')">Cấu trúc dự án</button>
+          <button class="suggestion-chip" onclick="sendSuggestion('Mô tả tổng quát về mục tiêu của dự án')">Tổng quan</button>
           <button class="suggestion-chip" onclick="sendSuggestion('Tạo sequence diagram cho luồng chính của ứng dụng')">Sequence diagram</button>
           <button class="suggestion-chip" onclick="sendSuggestion('Liệt kê các API endpoint có trong project')">Danh sách APIs</button>
           <button class="suggestion-chip" onclick="sendSuggestion('Xem nội dung các file trong thư mục rules/ nếu có')">Xem các rules</button>
           <button class="suggestion-chip" id="pull-chip" onclick="pullCurrentRepo()">⬇ Pull code</button>
         </div>
         <div id="input-row">
-          <textarea id="msg-input" rows="1" placeholder="Hỏi về code, tạo branch, review, viết docs…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <textarea id="msg-input" rows="1" placeholder="Hỏi bất cứ điều gì, hoặc bảo agent làm gì đó…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
           <button id="send-btn" onclick="sendMessage()">SEND ↑</button>
         </div>
-        <div class="chat-footer-note">3 ANH EM agent can make mistakes. Please double-check responses.</div>
+        <div class="chat-footer-note">3 ANH EM CODE AGENT can make mistakes. Please double-check responses.</div>
       </div>
     </div>
   </main>

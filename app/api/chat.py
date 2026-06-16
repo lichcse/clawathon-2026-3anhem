@@ -150,7 +150,7 @@ async def clear_history(
     repo = result.scalar_one_or_none()
     if not repo:
         raise HTTPException(404, "Repository not found")
-    if repo.user_id != current_user.id:
+    if repo.user_id != current_user.id and not repo.is_shared:
         raise HTTPException(403, "Access denied")
 
     msgs = await db.execute(
