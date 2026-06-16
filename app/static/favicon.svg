@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <filter id="neon-blue" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.2" result="blur1"/>
+      <feGaussianBlur stdDeviation="0.5" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="neon-green" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.2" result="blur1"/>
+      <feGaussianBlur stdDeviation="0.5" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#161b22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background with subtle border -->
+  <rect width="32" height="32" rx="6" fill="url(#bg-grad)"/>
+  <rect width="32" height="32" rx="6" fill="none" stroke="#1f6feb" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- < left bracket -->
+  <polyline
+    points="9,9 4,16 9,23"
+    stroke="#58a6ff"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    filter="url(#neon-blue)"
+    opacity="0.95"
+  />
+
+  <!-- / slash (green — git/code merge color) -->
+  <line
+    x1="21" y1="7"
+    x2="11" y2="25"
+    stroke="#3fb950"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    filter="url(#neon-green)"
+    opacity="0.95"
+  />
+
+  <!-- > right bracket -->
+  <polyline
+    points="23,9 28,16 23,23"
+    stroke="#58a6ff"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    filter="url(#neon-blue)"
+    opacity="0.95"
+  />
+
+  <!-- Center dot — AI "eye" -->
+  <circle cx="16" cy="16" r="1.4" fill="#58a6ff" opacity="0.7" filter="url(#neon-blue)"/>
+</svg>
