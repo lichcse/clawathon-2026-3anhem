@@ -617,6 +617,11 @@ async function deleteRepo() {
 /* ─── Helpers ─── */
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function closeModalOutside(e) { if (e.target === e.currentTarget) closeModal(e.currentTarget.id); }
+function toggleWorldCupSidebar() {
+  const sidebar = document.getElementById('worldcup-sidebar');
+  sidebar.classList.toggle('wc-open');
+}
+
 function toggleSidebar() {
   const s = document.getElementById('sidebar');
   const btn = document.getElementById('sidebar-show-btn');

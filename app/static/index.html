@@ -74,6 +74,7 @@
       <div class="chat-actions">
         <select id="model-selector" onchange="selectedModel=this.value" title="Select AI model"></select>
         <button onclick="clearHistory()" title="Clear chat history">🗑 Clear</button>
+        <button id="wc-toggle-btn" class="icon-btn wc-toggle-btn" onclick="toggleWorldCupSidebar()" title="Vui cùng World Cup 2026">⚽</button>
       </div>
     </div>
 
@@ -121,6 +122,7 @@
   <aside id="worldcup-sidebar">
     <div id="wc-header">
       <h3>⚽ Vui cùng World Cup 2026</h3>
+      <button class="wc-close-btn" onclick="toggleWorldCupSidebar()" title="Đóng">✕</button>
     </div>
     <div id="wc-content">
       <div style="padding:20px;text-align:center;color:var(--text-2);font-size:12px;">Đang tải…</div>

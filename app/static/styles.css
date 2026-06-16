@@ -814,10 +814,55 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.wc-toggle-btn {
+  display: none;
+  font-size: 16px;
+  padding: 4px 8px;
+}
+.wc-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.wc-close-btn:hover { color: var(--text); }
+
+@media (max-width: 768px) {
+  #worldcup-sidebar {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    min-width: 0;
+    z-index: 200;
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.6);
+  }
+  #worldcup-sidebar.wc-open {
+    display: flex;
+  }
+  .wc-toggle-btn {
+    display: inline-flex;
+  }
+  .wc-close-btn {
+    display: block;
+  }
+}
+
 #wc-header {
   padding: 13px 14px 11px;
   border-bottom: 1px solid var(--border);
   text-align: center;
+  position: relative;
 }
 #wc-header h3 {
   font-size: 11px;
