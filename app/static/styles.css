@@ -294,6 +294,8 @@ body {
 
 .repo-icon { font-size: 14px; flex-shrink: 0; opacity: .7; }
 .repo-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.repo-public-badge { display: inline-flex; align-items: center; flex-shrink: 0; color: var(--text-2); opacity: 0.6; }
+.repo-item:hover .repo-public-badge { opacity: 1; color: var(--primary); }
 .repo-status { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .repo-status.ready   { background: var(--green); box-shadow: var(--glow-green); }
 .repo-status.cloning { background: var(--yellow); animation: pulse 1.5s infinite; }

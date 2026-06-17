@@ -80,6 +80,7 @@ function renderRepos(repos) {
     <div class="repo-item ${r.id === currentRepoId ? 'active' : ''}" onclick="selectRepo(${r.id})" data-id="${r.id}">
       <span class="repo-icon">📁</span>
       <span class="repo-name" title="${r.name}">${r.name}</span>
+      ${!r.is_owner ? `<span class="repo-public-badge" title="Public repository"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>` : ''}
       <span class="repo-status ${r.clone_status}" title="${r.clone_status}"></span>
       <button class="repo-menu-btn" onclick="openContextMenu(event,${r.id},${r.is_owner})" title="Options" ${r.is_owner ? '' : 'style="display:none"'}>⋯</button>
     </div>
