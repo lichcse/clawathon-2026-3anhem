@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>3 ANH EM — Vote Thumbnail</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    background: #080d1a;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .glow-left {
+    position: absolute;
+    left: -80px; top: 50%;
+    transform: translateY(-50%);
+    width: 480px; height: 480px;
+    background: radial-gradient(circle, rgba(0,212,255,0.12) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  .glow-right {
+    position: absolute;
+    right: -60px; bottom: -60px;
+    width: 360px; height: 360px;
+    background: radial-gradient(circle, rgba(0,255,136,0.09) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  .container {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 56px;
+    z-index: 1;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hex-icon {
+    width: 36px; height: 36px;
+    color: #00d4ff;
+  }
+
+  .brand-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .event-tag {
+    font-size: 13px;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 1.5px;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* DIVIDER */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,212,255,0.6) 0%, rgba(0,255,136,0.3) 50%, transparent 100%);
+    margin: 20px 0;
+  }
+
+  /* MAIN CONTENT */
+  .main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+  }
+
+  .left {
+    flex: 1;
+  }
+
+  .code-comment {
+    font-size: 15px;
+    color: #00ff88;
+    letter-spacing: 0.5px;
+    margin-bottom: 28px;
+    opacity: 0.85;
+  }
+
+  .tagline {
+    font-size: 72px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -1px;
+    margin-bottom: 32px;
+    font-family: 'Arial Black', 'Arial', sans-serif;
+  }
+
+  .tagline .line1 { color: #fff; }
+  .tagline .line2 {
+    color: #00d4ff;
+    display: block;
+  }
+
+  .capabilities {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .cap {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.3px;
+  }
+
+  /* RIGHT */
+  .right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+
+  .qr-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .qr-card img {
+    width: 160px;
+    height: 160px;
+    display: block;
+  }
+
+  .qr-label {
+    font-size: 11px;
+    color: #080d1a;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .vote-btn {
+    background: #00d4ff;
+    color: #080d1a;
+    font-size: 17px;
+    font-weight: 900;
+    font-family: 'Arial Black', 'Arial', sans-serif;
+    letter-spacing: 2px;
+    padding: 14px 32px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .vote-btn span {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1.5px;
+    color: rgba(0,0,0,0.55);
+    margin-top: 4px;
+  }
+
+  /* BOTTOM */
+  .bottom-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(0,255,136,0.3) 40%, rgba(0,212,255,0.6) 100%);
+    margin: 20px 0;
+  }
+
+  .bottombar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .team {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .team-label {
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .members {
+    display: flex;
+    gap: 12px;
+  }
+
+  .member {
+    font-size: 15px;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .member::after {
+    content: '·';
+    color: rgba(0,212,255,0.4);
+  }
+
+  .member:last-child::after { content: ''; }
+
+  .member .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #00ff88;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .powered {
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 1.5px;
+    text-align: right;
+  }
+
+  .powered strong {
+    color: #00d4ff;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="glow-left"></div>
+<div class="glow-right"></div>
+
+<div class="container">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="brand">
+      <svg class="hex-icon" viewBox="0 0 36 36" fill="none">
+        <polygon points="18,2 33,10 33,26 18,34 3,26 3,10" stroke="#00d4ff" stroke-width="2" fill="rgba(0,212,255,0.1)"/>
+        <polygon points="18,8 28,13.5 28,24.5 18,30 8,24.5 8,13.5" stroke="#00d4ff" stroke-width="1" fill="none" opacity="0.4"/>
+      </svg>
+      <span class="brand-name">3 ANH EM</span>
+    </div>
+    <span class="event-tag">GreenNode Claw-a-thon 2026 · Nhóm 3</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="left">
+      <div class="code-comment">// No code. No complexity. Just ask.</div>
+
+      <div class="tagline">
+        <span class="line1">You imagine it.</span>
+        <span class="line2">AI builds it.</span>
+      </div>
+
+      <div class="capabilities">
+        <div class="cap">Hỏi đáp codebase</div>
+        <div class="cap">Tạo code</div>
+        <div class="cap">Refactor</div>
+        <div class="cap">Viết docs</div>
+        <div class="cap">Review PR tự động</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="qr-card">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://endpoint-55a2ec46-1573-44d8-be75-75ff6c63983d.agentbase-runtime.aiplatform.vngcloud.vn/" alt="QR code">
+        <div class="qr-label">Thử ngay</div>
+      </div>
+      <div class="vote-btn">
+        ⬡ BẦU CHỌN NGAY
+        <span>cho Nhóm 3</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-divider"></div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <div class="team">
+      <span class="team-label">Team</span>
+      <div class="members">
+        <div class="member"><span class="dot"></span>Lịch</div>
+        <div class="member"><span class="dot"></span>Khải</div>
+        <div class="member"><span class="dot"></span>Quý</div>
+      </div>
+    </div>
+    <div class="powered">Powered by <strong>GreenNode AgentBase</strong></div>
+  </div>
+</div>
+</body>
+</html>
